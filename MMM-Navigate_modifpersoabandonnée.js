@@ -2,6 +2,8 @@
 
 var locked = false;
 var confirm = 0;
+var lockedmenuid=0; 
+
 
 Module.register("MMM-Navigate",{
 	// Default module config.
@@ -64,7 +66,7 @@ Module.register("MMM-Navigate",{
 		if (this.loading) {
 			var loading = document.createElement("div");
 			  loading.innerHTML = this.translate("LOADING");
-			  loading.className = "light small";
+			  loading.className = "dimmed light small";
 			  wrapper.appendChild(loading);
 			return wrapper
 		}
@@ -73,7 +75,7 @@ Module.register("MMM-Navigate",{
     
 		//Div after loading
 		var parent = document.createElement("div");
-        parent.className = "light xsmall";
+        parent.className = "xsmall bright";
         parent.setAttribute('tabindex', 0);//set tabindex on div for focus purposes
 
 		//build navigation from array
@@ -104,13 +106,15 @@ Module.register("MMM-Navigate",{
         var self = this;
         var selectedid = '';
         var test = '';
-        
-        if(payload.inputtype === 'CW'){
+            
             confirm = 0;
             self.show(0);
             selectedid = fselectedid();
+                    
+        if(locked==false){//Menu not locked so change selection by CW and CCW
 
-            if(locked==false){//Menu not locked so change selection by CW and CCW
+			
+			if(payload.inputtype === 'CW'){
                 if(selectedid==''){//first li gets class="selected"
                     document.getElementsByTagName('li')[0].setAttribute('class', 'selected');
                 }else if(selectedid==self.config.Action.length-1){//last entry reached, set mark on first entry
@@ -120,15 +124,8 @@ Module.register("MMM-Navigate",{
                     document.getElementsByTagName('li')[selectedid].setAttribute('class', '');
                     document.getElementsByTagName('li')[parseInt(selectedid)+1].setAttribute('class', 'selected');
                 }
-            }else{//Menu locked so execute first or second payload of array (depending on CW or CCW)
-                self.sendAction(self.config.Action[selectedid][0]);
-            }
-        }else if(payload.inputtype === 'CCW'){
-            confirm = 0;
-            self.show(0);
-            selectedid = fselectedid();
 
-            if(locked==false){//Menu not locked so change selection by CW and CCW
+			}else if(payload.inputtype === 'CCW'){
                 if(selectedid==''){
                     document.getElementsByTagName('li')[self.config.Action.length-1].setAttribute('class', 'selected');
                 }else if(selectedid==0){//first entry reached, set mark on last entry
@@ -138,29 +135,77 @@ Module.register("MMM-Navigate",{
                     document.getElementsByTagName('li')[selectedid].setAttribute('class', '');
                     document.getElementsByTagName('li')[parseInt(selectedid)-1].setAttribute('class', 'selected');
                 }
-            }else{//Menu locked so execute first or second payload of array (depending on CW or CCW)
-                self.sendAction(self.config.Action[selectedid][1]);
-            }
-        }else if(payload.inputtype === 'PRESSED'){
-            self.show(0);
-            selectedid = fselectedid();
 
-            if(locked==false){//Menu not locked so ... (see below)
+			}else if(payload.inputtype === 'PRESSED'){
+            //self.show(0);
+            //selectedid = fselectedid();
+
                 if(Array.isArray(self.config.Action[selectedid])){//if selected entry Action is array - lock it
                     locked = true;
                     document.getElementsByTagName('li')[selectedid].setAttribute('class', 'selected locked');
+                    lockedmenuid=0;//on repart à 0 pour le='id du menu puisqu'on a changé de selection lockée
+                    this.naviaction(''); //re-request himself to go to the locked=true
+
                     //console.log('Alex: locked setzen.');
                 }else{//if selected entry Action is object - so there is nothing to lock - execute it
                     self.show(0,{force: true});           
                     //console.log('Alex, Payload: ', self.config.Action[selectedid].notification,' xxx ',self.config.Action[selectedid].payload);
                     self.sendAction(self.config.Action[selectedid]);
                 }
-            }else{//Menu locked so unlock it
-                locked = false;
+           
+			}
+		}//fin locked = false
+		else{ //menu locked
+			var maxid = self.config.Action[selectedid].length-1;
+			//affiche la taille du sous-menu - debug
+			this.sendNotification("SHOW_ALERT",{type:"notification",message:"Taille sous menu : " + maxid + "id courant : " + lockedmenuid});
+		
+			if(payload.inputtype === 'CW'){
+					
+					self.sendAction(self.config.Action[selectedid][lockedmenuid]);
+					lockedmenuid++;
+					
+					if(lockedmenuid > maxid){
+						lockedmenuid=0;
+					}
+					if(lockedmenuid < 0){
+						lockedmenuid=maxid;
+					}
+
+			}else if(payload.inputtype === 'CCW'){
+					self.sendAction(self.config.Action[selectedid][lockedmenuid]);
+					lockedmenuid--;
+					
+					if(lockedmenuid < 0){
+						lockedmenuid=maxid;
+					}
+					if(lockedmenuid > maxid){
+						lockedmenuid=0;
+					}
+
+			}else if(payload.inputtype === 'PRESSED'){//Menu locked so unlock it
+				locked = false;
                 document.getElementsByTagName('li')[selectedid].setAttribute('class', 'selected');
-                //console.log('Alex: locked auf false setzen setzen. Selectedid: ',selectedid);
+                //this.naviaction(''); //re-request himself to go to the locked=true ??
+
+			}
+		}
+			
+			////////
+		
+		/*           }else{//Menu locked so execute first or second payload of array (depending on CW or CCW)
+                for (var id=0; id < self.config.Action[selectedid].length ; id++){
+					self.sendAction(self.config.Action[selectedid][id]);
+				}
             }
-        }
+            
+            
+                        }else{//Menu locked so execute first or second payload of array (depending on CW or CCW)
+                self.sendAction(self.config.Action[selectedid][1]);
+            }
+
+            }//*/
+            /////
             
         function fselectedid(){//get ID and return it
             for (let index = 0; index < self.config.Action.length; index++) {
